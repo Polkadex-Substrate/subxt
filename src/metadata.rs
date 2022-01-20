@@ -1,4 +1,4 @@
-// Copyright 2019-2021 Parity Technologies (UK) Ltd.
+// Copyright 2019-2022 Parity Technologies (UK) Ltd.
 // This file is part of subxt.
 //
 // subxt is free software: you can redistribute it and/or modify
@@ -143,6 +143,11 @@ pub struct PalletMetadata {
 }
 
 impl PalletMetadata {
+    /// Get the name of the pallet.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     /// Encode a call based on this pallet metadata.
     pub fn encode_call<C>(&self, call: &C) -> Result<Encoded, MetadataError>
     where

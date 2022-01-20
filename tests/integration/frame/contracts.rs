@@ -1,4 +1,4 @@
-// Copyright 2019-2021 Parity Technologies (UK) Ltd.
+// Copyright 2019-2022 Parity Technologies (UK) Ltd.
 // This file is part of subxt.
 //
 // subxt is free software: you can redistribute it and/or modify
@@ -24,9 +24,10 @@ use crate::{
             storage,
         },
         system,
-        DefaultConfig,
+        DefaultAccountData,
     },
     test_context,
+    NodeRuntimeSignedExtra,
     TestContext,
 };
 use sp_core::sr25519::Pair;
@@ -34,14 +35,15 @@ use sp_runtime::MultiAddress;
 use subxt::{
     Client,
     Config,
+    DefaultConfig,
     Error,
-    ExtrinsicSuccess,
     PairSigner,
+    TransactionProgress,
 };
 
 struct ContractsTestContext {
     cxt: TestContext,
-    signer: PairSigner<DefaultConfig, Pair>,
+    signer: PairSigner<DefaultConfig, NodeRuntimeSignedExtra, Pair>,
 }
 
 type Hash = <DefaultConfig as Config>::Hash;
@@ -59,7 +61,9 @@ impl ContractsTestContext {
         self.cxt.client()
     }
 
-    fn contracts_tx(&self) -> TransactionApi<DefaultConfig> {
+    fn contracts_tx(
+        &self,
+    ) -> TransactionApi<DefaultConfig, NodeRuntimeSignedExtra, DefaultAccountData> {
         self.cxt.api.tx().contracts()
     }
 
@@ -73,7 +77,7 @@ impl ContractsTestContext {
             "#;
         let code = wabt::wat2wasm(CONTRACT).expect("invalid wabt");
 
-        let result = self
+        let events = self
             .cxt
             .api
             .tx()
@@ -81,26 +85,29 @@ impl ContractsTestContext {
             .instantiate_with_code(
                 100_000_000_000_000_000, // endowment
                 500_000_000_000,         // gas_limit
+                None,                    // storage_deposit_limit
                 code,
                 vec![], // data
                 vec![], // salt
             )
             .sign_and_submit_then_watch(&self.signer)
+            .await?
+            .wait_for_finalized_success()
             .await?;
 
-        let code_stored = result
-            .find_event::<events::CodeStored>()?
+        let code_stored = events
+            .find_first_event::<events::CodeStored>()?
             .ok_or_else(|| Error::Other("Failed to find a CodeStored event".into()))?;
-        let instantiated = result
-            .find_event::<events::Instantiated>()?
+        let instantiated = events
+            .find_first_event::<events::Instantiated>()?
             .ok_or_else(|| Error::Other("Failed to find a Instantiated event".into()))?;
-        let _extrinsic_success = result
-            .find_event::<system::events::ExtrinsicSuccess>()?
+        let _extrinsic_success = events
+            .find_first_event::<system::events::ExtrinsicSuccess>()?
             .ok_or_else(|| {
                 Error::Other("Failed to find a ExtrinsicSuccess event".into())
             })?;
 
-        log::info!("  Block hash: {:?}", result.block);
+        log::info!("  Block hash: {:?}", events.block_hash());
         log::info!("  Code hash: {:?}", code_stored.code_hash);
         log::info!("  Contract address: {:?}", instantiated.contract);
         Ok((code_stored.code_hash, instantiated.contract))
@@ -118,16 +125,19 @@ impl ContractsTestContext {
             .instantiate(
                 100_000_000_000_000_000, // endowment
                 500_000_000_000,         // gas_limit
+                None,                    // storage_deposit_limit
                 code_hash,
                 data,
                 salt,
             )
             .sign_and_submit_then_watch(&self.signer)
+            .await?
+            .wait_for_finalized_success()
             .await?;
 
         log::info!("Instantiate result: {:?}", result);
         let instantiated = result
-            .find_event::<events::Instantiated>()?
+            .find_first_event::<events::Instantiated>()?
             .ok_or_else(|| Error::Other("Failed to find a Instantiated event".into()))?;
 
         Ok(instantiated.contract)
@@ -137,7 +147,7 @@ impl ContractsTestContext {
         &self,
         contract: AccountId,
         input_data: Vec<u8>,
-    ) -> Result<ExtrinsicSuccess<DefaultConfig>, Error> {
+    ) -> Result<TransactionProgress<'_, DefaultConfig>, Error> {
         log::info!("call: {:?}", contract);
         let result = self
             .contracts_tx()
@@ -145,6 +155,7 @@ impl ContractsTestContext {
                 MultiAddress::Id(contract),
                 0,           // value
                 500_000_000, // gas_limit
+                None,        // storage_deposit_limit
                 input_data,
             )
             .sign_and_submit_then_watch(&self.signer)

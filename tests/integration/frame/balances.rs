@@ -1,4 +1,4 @@
-// Copyright 2019-2021 Parity Technologies (UK) Ltd.
+// Copyright 2019-2022 Parity Technologies (UK) Ltd.
 // This file is part of subxt.
 //
 // subxt is free software: you can redistribute it and/or modify
@@ -19,8 +19,8 @@ use crate::{
         balances,
         runtime_types,
         system,
-        DefaultConfig,
     },
+    pair_signer,
     test_context,
 };
 use codec::Decode;
@@ -30,20 +30,18 @@ use sp_core::{
 };
 use sp_keyring::AccountKeyring;
 use subxt::{
-    extrinsic::{
-        PairSigner,
-        Signer,
-    },
+    DefaultConfig,
     Error,
     EventSubscription,
     PalletError,
     RuntimeError,
+    Signer,
 };
 
 #[async_std::test]
-async fn tx_basic_transfer() {
-    let alice = PairSigner::<DefaultConfig, _>::new(AccountKeyring::Alice.pair());
-    let bob = PairSigner::<DefaultConfig, _>::new(AccountKeyring::Bob.pair());
+async fn tx_basic_transfer() -> Result<(), subxt::Error> {
+    let alice = pair_signer(AccountKeyring::Alice.pair());
+    let bob = pair_signer(AccountKeyring::Bob.pair());
     let bob_address = bob.account_id().clone().into();
     let cxt = test_context().await;
     let api = &cxt.api;
@@ -52,28 +50,27 @@ async fn tx_basic_transfer() {
         .storage()
         .system()
         .account(alice.account_id().clone(), None)
-        .await
-        .unwrap();
+        .await?;
     let bob_pre = api
         .storage()
         .system()
         .account(bob.account_id().clone(), None)
-        .await
-        .unwrap();
+        .await?;
 
-    let result = api
+    let events = api
         .tx()
         .balances()
         .transfer(bob_address, 10_000)
         .sign_and_submit_then_watch(&alice)
-        .await
-        .unwrap();
-    let event = result
-        .find_event::<balances::events::Transfer>()
-        .unwrap()
-        .unwrap();
-    let _extrinsic_success = result
-        .find_event::<system::events::ExtrinsicSuccess>()
+        .await?
+        .wait_for_finalized_success()
+        .await?;
+    let event = events
+        .find_first_event::<balances::events::Transfer>()
+        .expect("Failed to decode balances::events::Transfer")
+        .expect("Failed to find balances::events::Transfer");
+    let _extrinsic_success = events
+        .find_first_event::<system::events::ExtrinsicSuccess>()
         .expect("Failed to decode ExtrinisicSuccess")
         .expect("Failed to find ExtrinisicSuccess");
 
@@ -88,17 +85,16 @@ async fn tx_basic_transfer() {
         .storage()
         .system()
         .account(alice.account_id().clone(), None)
-        .await
-        .unwrap();
+        .await?;
     let bob_post = api
         .storage()
         .system()
         .account(bob.account_id().clone(), None)
-        .await
-        .unwrap();
+        .await?;
 
     assert!(alice_pre.data.free - 10_000 >= alice_post.data.free);
     assert_eq!(bob_pre.data.free + 10_000, bob_post.data.free);
+    Ok(())
 }
 
 #[async_std::test]
@@ -116,12 +112,11 @@ async fn storage_total_issuance() {
 
 #[async_std::test]
 async fn storage_balance_lock() -> Result<(), subxt::Error> {
-    let bob = PairSigner::<DefaultConfig, _>::new(AccountKeyring::Bob.pair());
+    let bob = pair_signer(AccountKeyring::Bob.pair());
     let charlie = AccountKeyring::Charlie.to_account_id();
     let cxt = test_context().await;
 
-    let result = cxt
-        .api
+    cxt.api
         .tx()
         .staking()
         .bond(
@@ -130,10 +125,11 @@ async fn storage_balance_lock() -> Result<(), subxt::Error> {
             runtime_types::pallet_staking::RewardDestination::Stash,
         )
         .sign_and_submit_then_watch(&bob)
-        .await?;
-
-    let success = result.find_event::<system::events::ExtrinsicSuccess>()?;
-    assert!(success.is_some(), "No ExtrinsicSuccess Event found");
+        .await?
+        .wait_for_finalized_success()
+        .await?
+        .find_first_event::<system::events::ExtrinsicSuccess>()?
+        .expect("No ExtrinsicSuccess Event found");
 
     let locks = cxt
         .api
@@ -157,9 +153,9 @@ async fn storage_balance_lock() -> Result<(), subxt::Error> {
 #[async_std::test]
 async fn transfer_error() {
     env_logger::try_init().ok();
-    let alice = PairSigner::<DefaultConfig, _>::new(AccountKeyring::Alice.pair());
+    let alice = pair_signer(AccountKeyring::Alice.pair());
     let alice_addr = alice.account_id().clone().into();
-    let hans = PairSigner::<DefaultConfig, _>::new(Pair::generate().0);
+    let hans = pair_signer(Pair::generate().0);
     let hans_address = hans.account_id().clone().into();
     let cxt = test_context().await;
 
@@ -169,6 +165,9 @@ async fn transfer_error() {
         .transfer(hans_address, 100_000_000_000_000_000)
         .sign_and_submit_then_watch(&alice)
         .await
+        .unwrap()
+        .wait_for_finalized_success()
+        .await
         .unwrap();
 
     let res = cxt
@@ -177,6 +176,9 @@ async fn transfer_error() {
         .balances()
         .transfer(alice_addr, 100_000_000_000_000_000)
         .sign_and_submit_then_watch(&hans)
+        .await
+        .unwrap()
+        .wait_for_finalized_success()
         .await;
 
     if let Err(Error::Runtime(RuntimeError::Module(error))) = res {
@@ -187,14 +189,14 @@ async fn transfer_error() {
         };
         assert_eq!(error, error2);
     } else {
-        panic!("expected an error");
+        panic!("expected a runtime module error");
     }
 }
 
 #[async_std::test]
 async fn transfer_subscription() {
     env_logger::try_init().ok();
-    let alice = PairSigner::<DefaultConfig, _>::new(AccountKeyring::Alice.pair());
+    let alice = pair_signer(AccountKeyring::Alice.pair());
     let bob = AccountKeyring::Bob.to_account_id();
     let bob_addr = bob.clone().into();
     let cxt = test_context().await;
@@ -213,6 +215,39 @@ async fn transfer_subscription() {
 
     let raw = sub.next().await.unwrap().unwrap();
     let event = balances::events::Transfer::decode(&mut &raw.data[..]).unwrap();
+    assert_eq!(
+        event,
+        balances::events::Transfer {
+            from: alice.account_id().clone(),
+            to: bob.clone(),
+            amount: 10_000
+        }
+    );
+}
+
+#[async_std::test]
+async fn transfer_implicit_subscription() {
+    env_logger::try_init().ok();
+    let alice = pair_signer(AccountKeyring::Alice.pair());
+    let bob = AccountKeyring::Bob.to_account_id();
+    let bob_addr = bob.clone().into();
+    let cxt = test_context().await;
+
+    let event = cxt
+        .api
+        .tx()
+        .balances()
+        .transfer(bob_addr, 10_000)
+        .sign_and_submit_then_watch(&alice)
+        .await
+        .unwrap()
+        .wait_for_finalized_success()
+        .await
+        .unwrap()
+        .find_first_event::<balances::events::Transfer>()
+        .expect("Can decode events")
+        .expect("Can find balance transfer event");
+
     assert_eq!(
         event,
         balances::events::Transfer {

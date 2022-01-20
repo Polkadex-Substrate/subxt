@@ -1,4 +1,4 @@
-// Copyright 2019-2021 Parity Technologies (UK) Ltd.
+// Copyright 2019-2022 Parity Technologies (UK) Ltd.
 // This file is part of subxt.
 //
 // subxt is free software: you can redistribute it and/or modify
@@ -15,22 +15,17 @@
 // along with subxt.  If not, see <http://www.gnu.org/licenses/>.
 
 use crate::{
-    node_runtime::{
-        system,
-        DefaultConfig,
-    },
+    node_runtime::system,
+    pair_signer,
     test_context,
 };
 use assert_matches::assert_matches;
 use sp_keyring::AccountKeyring;
-use subxt::extrinsic::{
-    PairSigner,
-    Signer,
-};
+use subxt::Signer;
 
 #[async_std::test]
-async fn storage_account() {
-    let alice = PairSigner::<DefaultConfig, _>::new(AccountKeyring::Alice.pair());
+async fn storage_account() -> Result<(), subxt::Error> {
+    let alice = pair_signer(AccountKeyring::Alice.pair());
 
     let cxt = test_context().await;
     let account_info = cxt
@@ -39,23 +34,27 @@ async fn storage_account() {
         .system()
         .account(alice.account_id().clone(), None)
         .await;
-    assert_matches!(account_info, Ok(_))
+
+    assert_matches!(account_info, Ok(_));
+    Ok(())
 }
 
 #[async_std::test]
-async fn tx_remark_with_event() {
-    let alice = PairSigner::<DefaultConfig, _>::new(AccountKeyring::Alice.pair());
+async fn tx_remark_with_event() -> Result<(), subxt::Error> {
+    let alice = pair_signer(AccountKeyring::Alice.pair());
     let cxt = test_context().await;
 
-    let result = cxt
+    let found_event = cxt
         .api
         .tx()
         .system()
         .remark_with_event(b"remarkable".to_vec())
         .sign_and_submit_then_watch(&alice)
-        .await
-        .unwrap();
+        .await?
+        .wait_for_finalized_success()
+        .await?
+        .has_event::<system::events::Remarked>()?;
 
-    let remarked = result.find_event::<system::events::Remarked>();
-    assert_matches!(remarked, Ok(Some(_)));
+    assert!(found_event);
+    Ok(())
 }

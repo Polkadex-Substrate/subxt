@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "cli", "codegen", "macro"]
+members = [".", "cli", "codegen", "macro", "test-runtime"]
 
 [package]
 name = "subxt"
@@ -24,7 +24,7 @@ chameleon = "0.1.0"
 scale-info = { version = "1.0.0", features = ["bit-vec"] }
 futures = "0.3.13"
 hex = "0.4.3"
-jsonrpsee = { version = "0.5.1", features = ["macros", "ws-client", "http-client"] }
+jsonrpsee = { version = "0.7.0", features = ["macros", "ws-client", "http-client", "client-ws-transport"] }
 log = "0.4.14"
 num-traits = { version = "0.2.14", default-features = false }
 serde = { version = "1.0.124", features = ["derive"] }
@@ -34,20 +34,20 @@ url = "2.2.1"
 
 subxt-macro = { version = "0.1.0", path = "macro" }
 
-sp-arithmetic = { package = "sp-arithmetic",branch = "polkadot-v0.9.13", git = 'https://github.com/paritytech/substrate' }
-sp-core = { package = "sp-core", branch = "polkadot-v0.9.13", git = 'https://github.com/paritytech/substrate' }
-sp-runtime = { package = "sp-runtime", branch = "polkadot-v0.9.13", git = 'https://github.com/paritytech/substrate' }
-sp-version = { package = "sp-version", branch = "polkadot-v0.9.13", git = 'https://github.com/paritytech/substrate' }
+sp-core = { version = "4.0.0", default-features = false  }
+sp-runtime = { version = "4.0.0", default-features = false }
+sp-version = "4.0.0"
 
 frame-metadata = "14.0.0"
+derivative = "2.2.0"
 
 [dev-dependencies]
+sp-arithmetic = { version = "4.0.0", default-features = false }
 assert_matches = "1.5.0"
 async-std = { version = "1.9.0", features = ["attributes", "tokio1"] }
 env_logger = "0.8.3"
 tempdir = "0.3.7"
 wabt = "0.10.0"
 which = "4.0.2"
-
-sp-keyring = { package = "sp-keyring", branch = "polkadot-v0.9.13", git = 'https://github.com/paritytech/substrate' }
-
+test-runtime = { path = "test-runtime" }
+sp-keyring = "4.0.0"

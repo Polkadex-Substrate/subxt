@@ -1,4 +1,4 @@
-// Copyright 2019-2021 Parity Technologies (UK) Ltd.
+// Copyright 2019-2022 Parity Technologies (UK) Ltd.
 // This file is part of subxt.
 //
 // subxt is free software: you can redistribute it and/or modify
@@ -15,7 +15,6 @@
 // along with subxt.  If not, see <http://www.gnu.org/licenses/>.
 
 mod codegen;
-mod runtime;
 mod utils;
 
 #[cfg(test)]
@@ -23,5 +22,5 @@ mod client;
 #[cfg(test)]
 mod frame;
 
-pub use runtime::node_runtime;
+pub use test_runtime::node_runtime;
 pub use utils::*;

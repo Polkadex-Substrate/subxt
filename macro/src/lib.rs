@@ -1,4 +1,4 @@
-// Copyright 2019-2021 Parity Technologies (UK) Ltd.
+// Copyright 2019-2022 Parity Technologies (UK) Ltd.
 // This file is part of subxt.
 //
 // subxt is free software: you can redistribute it and/or modify
@@ -39,7 +39,6 @@ struct GeneratedTypeDerives(Punctuated<syn::Path, syn::Token![,]>);
 pub fn subxt(args: TokenStream, input: TokenStream) -> TokenStream {
     let attr_args = parse_macro_input!(args as syn::AttributeArgs);
     let item_mod = parse_macro_input!(input as syn::ItemMod);
-
     let args = match RuntimeMetadataArgs::from_list(&attr_args) {
         Ok(v) => v,
         Err(e) => return TokenStream::from(e.write_errors()),

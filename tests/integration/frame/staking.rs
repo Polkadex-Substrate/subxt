@@ -1,4 +1,4 @@
-// Copyright 2019-2021 Parity Technologies (UK) Ltd.
+// Copyright 2019-2022 Parity Technologies (UK) Ltd.
 // This file is part of subxt.
 //
 // subxt is free software: you can redistribute it and/or modify
@@ -21,9 +21,8 @@ use crate::{
             ValidatorPrefs,
         },
         staking,
-        system,
-        DefaultConfig,
     },
+    pair_signer,
     test_context,
 };
 use assert_matches::assert_matches;
@@ -33,12 +32,9 @@ use sp_core::{
 };
 use sp_keyring::AccountKeyring;
 use subxt::{
-    extrinsic::{
-        PairSigner,
-        Signer,
-    },
     Error,
     RuntimeError,
+    Signer,
 };
 
 /// Helper function to generate a crypto pair from seed
@@ -55,26 +51,24 @@ fn default_validator_prefs() -> ValidatorPrefs {
 }
 
 #[async_std::test]
-async fn validate_with_controller_account() -> Result<(), Error> {
-    let alice = PairSigner::<DefaultConfig, _>::new(AccountKeyring::Alice.pair());
+async fn validate_with_controller_account() {
+    let alice = pair_signer(AccountKeyring::Alice.pair());
     let cxt = test_context().await;
-    let result = cxt
-        .api
+    cxt.api
         .tx()
         .staking()
         .validate(default_validator_prefs())
         .sign_and_submit_then_watch(&alice)
-        .await?;
-
-    let success = result.find_event::<system::events::ExtrinsicSuccess>()?;
-    assert!(success.is_some());
-
-    Ok(())
+        .await
+        .unwrap()
+        .wait_for_finalized_success()
+        .await
+        .expect("should be successful");
 }
 
 #[async_std::test]
 async fn validate_not_possible_for_stash_account() -> Result<(), Error> {
-    let alice_stash = PairSigner::<DefaultConfig, _>::new(get_from_seed("Alice//stash"));
+    let alice_stash = pair_signer(get_from_seed("Alice//stash"));
     let cxt = test_context().await;
     let announce_validator = cxt
         .api
@@ -82,6 +76,8 @@ async fn validate_not_possible_for_stash_account() -> Result<(), Error> {
         .staking()
         .validate(default_validator_prefs())
         .sign_and_submit_then_watch(&alice_stash)
+        .await?
+        .wait_for_finalized_success()
         .await;
     assert_matches!(announce_validator, Err(Error::Runtime(RuntimeError::Module(module_err))) => {
         assert_eq!(module_err.pallet, "Staking");
@@ -91,30 +87,27 @@ async fn validate_not_possible_for_stash_account() -> Result<(), Error> {
 }
 
 #[async_std::test]
-async fn nominate_with_controller_account() -> Result<(), Error> {
-    let alice = PairSigner::<DefaultConfig, _>::new(AccountKeyring::Alice.pair());
-    let bob = PairSigner::<DefaultConfig, _>::new(AccountKeyring::Bob.pair());
+async fn nominate_with_controller_account() {
+    let alice = pair_signer(AccountKeyring::Alice.pair());
+    let bob = pair_signer(AccountKeyring::Bob.pair());
     let cxt = test_context().await;
 
-    let result = cxt
-        .api
+    cxt.api
         .tx()
         .staking()
         .nominate(vec![bob.account_id().clone().into()])
         .sign_and_submit_then_watch(&alice)
-        .await?;
-
-    let success = result.find_event::<system::events::ExtrinsicSuccess>()?;
-    assert!(success.is_some());
-
-    Ok(())
+        .await
+        .unwrap()
+        .wait_for_finalized_success()
+        .await
+        .expect("should be successful");
 }
 
 #[async_std::test]
 async fn nominate_not_possible_for_stash_account() -> Result<(), Error> {
-    let alice_stash =
-        PairSigner::<DefaultConfig, sr25519::Pair>::new(get_from_seed("Alice//stash"));
-    let bob = PairSigner::<DefaultConfig, _>::new(AccountKeyring::Bob.pair());
+    let alice_stash = pair_signer(get_from_seed("Alice//stash"));
+    let bob = pair_signer(AccountKeyring::Bob.pair());
     let cxt = test_context().await;
 
     let nomination = cxt
@@ -123,6 +116,8 @@ async fn nominate_not_possible_for_stash_account() -> Result<(), Error> {
         .staking()
         .nominate(vec![bob.account_id().clone().into()])
         .sign_and_submit_then_watch(&alice_stash)
+        .await?
+        .wait_for_finalized_success()
         .await;
 
     assert_matches!(nomination, Err(Error::Runtime(RuntimeError::Module(module_err))) => {
@@ -134,11 +129,9 @@ async fn nominate_not_possible_for_stash_account() -> Result<(), Error> {
 
 #[async_std::test]
 async fn chill_works_for_controller_only() -> Result<(), Error> {
-    let alice_stash =
-        PairSigner::<DefaultConfig, sr25519::Pair>::new(get_from_seed("Alice//stash"));
-    let bob_stash =
-        PairSigner::<DefaultConfig, sr25519::Pair>::new(get_from_seed("Bob//stash"));
-    let alice = PairSigner::<DefaultConfig, _>::new(AccountKeyring::Alice.pair());
+    let alice_stash = pair_signer(get_from_seed("Alice//stash"));
+    let bob_stash = pair_signer(get_from_seed("Bob//stash"));
+    let alice = pair_signer(AccountKeyring::Alice.pair());
     let cxt = test_context().await;
 
     // this will fail the second time, which is why this is one test, not two
@@ -147,6 +140,8 @@ async fn chill_works_for_controller_only() -> Result<(), Error> {
         .staking()
         .nominate(vec![bob_stash.account_id().clone().into()])
         .sign_and_submit_then_watch(&alice)
+        .await?
+        .wait_for_finalized_success()
         .await?;
 
     let ledger = cxt
@@ -164,6 +159,8 @@ async fn chill_works_for_controller_only() -> Result<(), Error> {
         .staking()
         .chill()
         .sign_and_submit_then_watch(&alice_stash)
+        .await?
+        .wait_for_finalized_success()
         .await;
 
     assert_matches!(chill, Err(Error::Runtime(RuntimeError::Module(module_err))) => {
@@ -171,21 +168,24 @@ async fn chill_works_for_controller_only() -> Result<(), Error> {
         assert_eq!(module_err.error, "NotController");
     });
 
-    let result = cxt
+    let is_chilled = cxt
         .api
         .tx()
         .staking()
         .chill()
         .sign_and_submit_then_watch(&alice)
-        .await?;
-    let chill = result.find_event::<staking::events::Chilled>()?;
-    assert!(chill.is_some());
+        .await?
+        .wait_for_finalized_success()
+        .await?
+        .has_event::<staking::events::Chilled>()?;
+    assert!(is_chilled);
+
     Ok(())
 }
 
 #[async_std::test]
 async fn tx_bond() -> Result<(), Error> {
-    let alice = PairSigner::<DefaultConfig, _>::new(AccountKeyring::Alice.pair());
+    let alice = pair_signer(AccountKeyring::Alice.pair());
     let cxt = test_context().await;
 
     let bond = cxt
@@ -198,6 +198,8 @@ async fn tx_bond() -> Result<(), Error> {
             RewardDestination::Stash,
         )
         .sign_and_submit_then_watch(&alice)
+        .await?
+        .wait_for_finalized_success()
         .await;
 
     assert!(bond.is_ok());
@@ -212,6 +214,8 @@ async fn tx_bond() -> Result<(), Error> {
             RewardDestination::Stash,
         )
         .sign_and_submit_then_watch(&alice)
+        .await?
+        .wait_for_finalized_success()
         .await;
 
     assert_matches!(bond_again, Err(Error::Runtime(RuntimeError::Module(module_err))) => {

@@ -1,4 +1,4 @@
-// Copyright 2019-2021 Parity Technologies (UK) Ltd.
+// Copyright 2019-2022 Parity Technologies (UK) Ltd.
 // This file is part of subxt.
 //
 // subxt is free software: you can redistribute it and/or modify
@@ -64,13 +64,9 @@ where
 
     /// Attempt to kill the running substrate process.
     pub fn kill(&mut self) -> Result<(), String> {
-        log::info!("Killing contracts node process {}", self.proc.id());
+        log::info!("Killing node process {}", self.proc.id());
         if let Err(err) = self.proc.kill() {
-            let err = format!(
-                "Error killing contracts node process {}: {}",
-                self.proc.id(),
-                err
-            );
+            let err = format!("Error killing node process {}: {}", self.proc.id(), err);
             log::error!("{}", err);
             return Err(err)
         }
