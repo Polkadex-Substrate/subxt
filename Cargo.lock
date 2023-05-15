@@ -2747,10 +2747,12 @@ dependencies = [
 
 [[package]]
 name = "scale-value"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11f549769261561e6764218f847e500588f9a79a289de49ce92f9e26642a3574"
+checksum = "e764359c2f24c4e80ec216f2d5e32ee874642073edd1be293644a3a3fb0e58f3"
 dependencies = [
+ "base58",
+ "blake2",
  "either",
  "frame-metadata",
  "parity-scale-codec",
@@ -3653,7 +3655,6 @@ version = "0.28.0"
 dependencies = [
  "impl-serde",
  "jsonrpsee",
- "parity-scale-codec",
  "serde",
  "substrate-runner",
  "subxt",
