@@ -2672,6 +2672,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c7e5527e4b3bf079d4c0b2f253418598c380722ba37ef20fac9088081407f2b6"
 dependencies = [
  "parity-scale-codec",
+ "scale-bits",
+ "scale-info",
+ "thiserror",
+]
+
+[[package]]
+name = "scale-decode"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "716db7b24ccd361634c56ec44537789deb2a7b4d81a7bfdf0b59970c5203cb80"
+dependencies = [
+ "parity-scale-codec",
  "primitive-types",
  "scale-bits",
  "scale-decode-derive",
@@ -2681,9 +2693,9 @@ dependencies = [
 
 [[package]]
 name = "scale-decode-derive"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b38741b2f78e4391b94eac6b102af0f6ea2b0f7fe65adb55d7f4004f507854db"
+checksum = "bd163388b8eddb9b7bfdc7356aa10f362994f3d2723a48b26a723899c9ef4526"
 dependencies = [
  "darling",
  "proc-macro-crate",
@@ -2721,9 +2733,9 @@ dependencies = [
 
 [[package]]
 name = "scale-info"
-version = "2.5.0"
+version = "2.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0cfdffd972d76b22f3d7f81c8be34b2296afd3a25e0a547bd9abe340a4dbbe97"
+checksum = "b569c32c806ec3abdf3b5869fb8bf1e0d275a7c1c9b0b05603d9464632649edf"
 dependencies = [
  "bitvec",
  "cfg-if",
@@ -2735,9 +2747,9 @@ dependencies = [
 
 [[package]]
 name = "scale-info-derive"
-version = "2.5.0"
+version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61fa974aea2d63dd18a4ec3a49d59af9f34178c73a4f56d2f18205628d00681e"
+checksum = "53012eae69e5aa5c14671942a5dd47de59d4cdcff8532a6dd0e081faf1119482"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -2755,7 +2767,7 @@ dependencies = [
  "frame-metadata",
  "parity-scale-codec",
  "scale-bits",
- "scale-decode",
+ "scale-decode 0.5.0",
  "scale-encode",
  "scale-info",
  "serde",
@@ -3510,7 +3522,7 @@ dependencies = [
  "parking_lot",
  "primitive-types",
  "scale-bits",
- "scale-decode",
+ "scale-decode 0.6.0",
  "scale-encode",
  "scale-info",
  "scale-value",
@@ -3653,7 +3665,6 @@ version = "0.28.0"
 dependencies = [
  "impl-serde",
  "jsonrpsee",
- "parity-scale-codec",
  "serde",
  "substrate-runner",
  "subxt",
