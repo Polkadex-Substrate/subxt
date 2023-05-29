@@ -21,7 +21,7 @@ sp-core-hashing = "8.0.0"
 
 [dev-dependencies]
 bitvec = { version = "1.0.0", default-features = false, features = ["alloc"] }
-criterion = "0.4"
+criterion = "0.5"
 scale-info = { version = "2.5.0", features = ["bit-vec"] }
 
 [lib]
